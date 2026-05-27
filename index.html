@@ -7,58 +7,57 @@
   <script src="https://cdn.tailwindcss.com"></script>
   <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
   <style>
-    /* Drop zone highlight */
     .drop-zone { border: 2px dashed #d1d5db; transition: border-color .2s, background-color .2s; }
     .drop-zone.drag-over { border-color: #f97316; background-color: #fff7ed; }
 
-    /* Markdown recipe styling */
     .recipe-content h2 { font-size:1.2rem; font-weight:700; margin:1.2rem 0 .4rem; color:#ea580c; }
     .recipe-content h3 { font-size:1rem;  font-weight:600; margin:.9rem 0 .3rem; color:#374151; }
     .recipe-content p  { margin:.3rem 0; line-height:1.7; }
     .recipe-content ul, .recipe-content ol { padding-left:1.5rem; margin:.3rem 0; }
-    .recipe-content li { margin:.15rem 0; line-height:1.6; }
+    .recipe-content li { margin:.2rem 0; line-height:1.7; }
     .recipe-content hr { margin:1.2rem 0; border-color:#e5e7eb; }
     .recipe-content strong { color:#1f2937; }
 
-    /* Spinner */
     @keyframes spin { to { transform:rotate(360deg); } }
     .spinner { animation:spin 1s linear infinite; }
 
-    /* Active tab */
     .tab-btn { border-bottom:2px solid transparent; transition:color .15s, border-color .15s; }
     .tab-btn.active { border-color:#f97316; color:#f97316; font-weight:600; }
+
+    .thumb-wrap { position:relative; display:inline-block; }
+    .thumb-del { position:absolute; top:-6px; right:-6px; width:22px; height:22px;
+      background:#ef4444; color:#fff; border-radius:50%; font-size:14px; line-height:22px;
+      text-align:center; cursor:pointer; font-weight:bold; box-shadow:0 1px 3px rgba(0,0,0,.3); }
   </style>
 </head>
 <body class="bg-orange-50 min-h-screen font-sans">
 
-  <!-- ▸ Header ────────────────────────────────────────────── -->
+  <!-- ▸ Header -->
   <header class="bg-white shadow-sm sticky top-0 z-10">
     <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
       <h1 class="text-xl font-bold text-orange-600">🍱 マイ冷蔵庫・レシピ提案AI</h1>
       <button onclick="openSettings()" class="p-2 rounded-full hover:bg-gray-100 text-xl" title="設定">⚙️</button>
     </div>
     <nav class="max-w-2xl mx-auto px-4 flex border-b border-gray-200 bg-white">
-      <button class="tab-btn active px-4 py-2 text-sm" data-tab="main"    onclick="switchTab('main')">📸 レシピ生成</button>
-      <button class="tab-btn         px-4 py-2 text-sm text-gray-500" data-tab="history" onclick="switchTab('history')">
+      <button class="tab-btn active px-4 py-2 text-sm" data-tab="main" onclick="switchTab('main')">📸 レシピ生成</button>
+      <button class="tab-btn px-4 py-2 text-sm text-gray-500" data-tab="history" onclick="switchTab('history')">
         📚 保存済み<span id="badge" class="ml-1 bg-orange-500 text-white text-xs rounded-full px-1.5 hidden"></span>
       </button>
     </nav>
   </header>
 
-  <!-- ▸ Settings Modal ───────────────────────────────────── -->
+  <!-- ▸ Settings Modal -->
   <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4" onclick="bgClose(event)">
     <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
       <div class="flex items-center justify-between mb-5">
         <h2 class="text-lg font-bold">⚙️ 設定</h2>
         <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
       </div>
-
       <label class="block text-sm font-medium text-gray-700 mb-1">AIプロバイダー</label>
       <select id="sel-provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 text-sm">
         <option value="gemini">Gemini 2.5 Flash（推奨・無料枠あり）</option>
         <option value="openai">OpenAI GPT-4o</option>
       </select>
-
       <label class="block text-sm font-medium text-gray-700 mb-1">APIキー</label>
       <div class="relative mb-1">
         <input id="inp-key" type="password" placeholder="APIキーを貼り付け"
@@ -67,7 +66,6 @@
           class="absolute right-2 top-2 text-gray-400 hover:text-gray-600 text-lg select-none">👁</button>
       </div>
       <p class="text-xs text-gray-400 mb-5">このブラウザ内にのみ保存されます。外部送信はされません。</p>
-
       <button onclick="saveSettings()"
         class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl transition">
         💾 保存する
@@ -76,32 +74,34 @@
     </div>
   </div>
 
-  <!-- ▸ Main ─────────────────────────────────────────────── -->
+  <!-- ▸ Main -->
   <main class="max-w-2xl mx-auto px-4 py-6">
 
     <!-- Tab: Generate -->
     <div id="tab-main">
 
-      <!-- Upload area -->
+      <!-- Drop zone / thumbnail grid -->
       <div id="drop-zone"
-        class="drop-zone rounded-2xl bg-white p-8 text-center cursor-pointer mb-4 select-none"
-        onclick="document.getElementById('camera-input').click()"
+        class="drop-zone rounded-2xl bg-white mb-4 select-none"
         ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
-        <div id="up-placeholder">
+
+        <!-- Placeholder (no images yet) -->
+        <div id="up-placeholder" class="p-8 text-center cursor-pointer" onclick="document.getElementById('camera-input').click()">
           <div class="text-6xl mb-3">📷</div>
           <p class="text-gray-600 font-medium">ここをタップして写真を選択</p>
-          <p class="text-gray-400 text-sm mt-1">またはドラッグ＆ドロップ</p>
+          <p class="text-gray-400 text-sm mt-1">またはドラッグ＆ドロップ（複数枚OK）</p>
           <p class="text-gray-400 text-xs mt-2">JPG / PNG / WebP 対応</p>
         </div>
-        <img id="preview" src="" alt="" class="hidden max-h-72 mx-auto rounded-xl object-contain pointer-events-none" />
+
+        <!-- Thumbnail grid (shown when ≥1 image) -->
+        <div id="thumb-grid" class="hidden p-4 flex flex-wrap gap-3 justify-start"></div>
       </div>
 
-      <!-- file picker（ギャラリーから選択） -->
-      <input id="file-input" type="file" accept="image/*" class="hidden" onchange="onFileSelect(event)" />
-      <!-- camera（直接カメラ起動） -->
+      <!-- Hidden file inputs -->
+      <input id="file-input"   type="file" accept="image/*"                    multiple class="hidden" onchange="onFileSelect(event)" />
       <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="onFileSelect(event)" />
 
-      <!-- Buttons row -->
+      <!-- Button row -->
       <div class="flex gap-3 mb-4">
         <button onclick="document.getElementById('camera-input').click()"
           class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition text-sm shadow">
@@ -109,12 +109,23 @@
         </button>
         <button onclick="document.getElementById('file-input').click()"
           class="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition text-sm">
-          🖼️ アルバムから選択
+          🖼️ アルバムから追加
         </button>
-        <button id="clear-btn" onclick="clearImage()"
+        <button id="clear-btn" onclick="clearAllImages()"
           class="hidden bg-white border border-gray-300 text-gray-500 px-4 py-3 rounded-xl hover:bg-gray-50 transition text-sm">
-          ✕
+          全削除
         </button>
+      </div>
+
+      <!-- Extra ingredients input -->
+      <div class="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+        <label class="block text-sm font-semibold text-gray-700 mb-1">
+          📝 写真に写っていない食材・調味料を追加
+        </label>
+        <textarea id="extra-ingredients" rows="2"
+          placeholder="例: 白米 2合、醤油 大さじ2、みりん、砂糖、卵 2個"
+          class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"></textarea>
+        <p class="text-xs text-gray-400 mt-1">カンマ区切りで複数入力できます。空欄でも問題ありません。</p>
       </div>
 
       <!-- Generate button -->
@@ -169,7 +180,9 @@
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let imgBase64 = null, imgMime = null, currentRecipe = null;
+  // images: [{base64, mime, dataUrl}]
+  let images = [];
+  let currentRecipe = null;
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   window.addEventListener("DOMContentLoaded", () => {
@@ -182,7 +195,7 @@
   function switchTab(tab) {
     ["main","history"].forEach(t => document.getElementById("tab-"+t).classList.toggle("hidden", t !== tab));
     document.querySelectorAll(".tab-btn").forEach(b => {
-      b.classList.toggle("active",       b.dataset.tab === tab);
+      b.classList.toggle("active",        b.dataset.tab === tab);
       b.classList.toggle("text-gray-500", b.dataset.tab !== tab);
     });
     if (tab === "history") renderHistory();
@@ -204,53 +217,99 @@
     setTimeout(closeSettings, 700);
   }
 
-  // ── Image ─────────────────────────────────────────────────────────────────
-  function onFileSelect(e) { const f = e.target.files[0]; if (f) loadImage(f); }
+  // ── Image handling ────────────────────────────────────────────────────────
+  function onFileSelect(e) {
+    const files = Array.from(e.target.files);
+    files.forEach(f => loadImage(f));
+    e.target.value = ""; // allow re-selecting same file
+  }
   function onDragOver(e)   { e.preventDefault(); document.getElementById("drop-zone").classList.add("drag-over"); }
   function onDragLeave()   { document.getElementById("drop-zone").classList.remove("drag-over"); }
   function onDrop(e) {
     e.preventDefault();
     document.getElementById("drop-zone").classList.remove("drag-over");
-    const f = e.dataTransfer?.files[0];
-    if (f && f.type.startsWith("image/")) loadImage(f);
+    Array.from(e.dataTransfer?.files || [])
+      .filter(f => f.type.startsWith("image/"))
+      .forEach(f => loadImage(f));
   }
+
   function loadImage(file) {
-    imgMime = file.type || "image/jpeg";
+    if (images.length >= 6) { showError("画像は最大6枚までです。"); return; }
+    const mime = file.type || "image/jpeg";
     const r = new FileReader();
     r.onload = ev => {
-      imgBase64 = ev.target.result.split(",")[1];
-      document.getElementById("preview").src = ev.target.result;
-      document.getElementById("preview").classList.remove("hidden");
-      document.getElementById("up-placeholder").classList.add("hidden");
-      document.getElementById("gen-btn").disabled = false;
-      document.getElementById("clear-btn").classList.remove("hidden");
+      const dataUrl = ev.target.result;
+      images.push({ base64: dataUrl.split(",")[1], mime, dataUrl });
+      renderThumbnails();
+      updateGenBtn();
       hideRecipe(); hideError();
     };
     r.readAsDataURL(file);
   }
-  function clearImage() {
-    imgBase64 = imgMime = null;
-    document.getElementById("preview").src = "";
-    document.getElementById("preview").classList.add("hidden");
-    document.getElementById("up-placeholder").classList.remove("hidden");
-    document.getElementById("gen-btn").disabled = true;
-    document.getElementById("clear-btn").classList.add("hidden");
-    document.getElementById("file-input").value = "";
+
+  function renderThumbnails() {
+    const grid = document.getElementById("thumb-grid");
+    const placeholder = document.getElementById("up-placeholder");
+    const clearBtn = document.getElementById("clear-btn");
+
+    if (images.length === 0) {
+      grid.classList.add("hidden");
+      placeholder.classList.remove("hidden");
+      clearBtn.classList.add("hidden");
+      return;
+    }
+    placeholder.classList.add("hidden");
+    grid.classList.remove("hidden");
+    clearBtn.classList.remove("hidden");
+
+    grid.innerHTML = images.map((img, i) => `
+      <div class="thumb-wrap">
+        <img src="${img.dataUrl}" class="w-24 h-24 object-cover rounded-xl border border-gray-200 shadow-sm" />
+        <div class="thumb-del" onclick="removeImage(${i})">×</div>
+      </div>
+    `).join("") + `
+      <div class="w-24 h-24 flex items-center justify-center rounded-xl border-2 border-dashed border-gray-300 cursor-pointer hover:border-orange-400 hover:bg-orange-50 transition"
+        onclick="document.getElementById('file-input').click()">
+        <span class="text-3xl text-gray-400">＋</span>
+      </div>`;
+  }
+
+  function removeImage(i) {
+    images.splice(i, 1);
+    renderThumbnails();
+    updateGenBtn();
+  }
+
+  function clearAllImages() {
+    if (!confirm("すべての画像を削除しますか？")) return;
+    images = [];
+    renderThumbnails();
+    updateGenBtn();
     hideRecipe(); hideError();
+  }
+
+  function updateGenBtn() {
+    document.getElementById("gen-btn").disabled = images.length === 0;
   }
 
   // ── Generate ──────────────────────────────────────────────────────────────
   async function generate() {
     const apiKey   = LS.get("api_key", "");
     const provider = LS.get("provider", "gemini");
-    if (!apiKey)   { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
-    if (!imgBase64) { showError("画像をアップロードしてください。"); return; }
+    if (!apiKey)         { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
+    if (images.length === 0) { showError("画像をアップロードしてください。"); return; }
 
     hideRecipe(); hideError();
     setLoading(true);
 
-    const prompt = `この画像に写っている食材をすべて識別してください。
-次に、それらの食材を使った料理を3つ提案してください。
+    const extra = document.getElementById("extra-ingredients").value.trim();
+    const extraLine = extra
+      ? `\nまた、以下の食材・調味料も手元にあります（写真には写っていません）：\n${extra}\n`
+      : "";
+
+    const prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
+それらすべての食材を活用した料理を3つ提案してください。
+
 各レシピは必ず以下の形式で出力してください：
 
 ---
@@ -258,11 +317,17 @@
 **調理時間**: XX分
 
 ### 材料（2人分）
-- 材料名: 分量
+- 食材名: 分量（例: 豚こま切れ肉 250g）
 
 ### 作り方
-1. ステップ1
-2. ステップ2
+各ステップには「食材名と具体的な分量」「調理器具」「火加減（強火・中火・弱火など）」「加熱時間の目安」を必ず明記してください。
+例のような形式で書いてください：
+「Step 1: フライパンにサラダ油 大さじ1（約12g）をひき、中火で30秒ほど熱する。」
+「Step 2: 豚こま切れ肉 250gを広げて入れ、触らずに2〜3分焼いて焼き色をつける。裏返してさらに1〜2分焼く。」
+
+1. Step 1: （具体的な内容）
+2. Step 2: （具体的な内容）
+（以下続く）
 ---
 
 日本語で答えてください。`;
@@ -270,16 +335,17 @@
     try {
       let text;
       if (provider === "gemini") {
+        // Build parts: text first, then all images
+        const parts = [{ text: prompt }];
+        images.forEach(img => parts.push({ inline_data: { mime_type: img.mime, data: img.base64 } }));
+
         const res = await fetch(
           `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
           {
             method: "POST",
             headers: { "Content-Type": "application/json" },
             body: JSON.stringify({
-              contents: [{ parts: [
-                { text: prompt },
-                { inline_data: { mime_type: imgMime, data: imgBase64 } },
-              ]}],
+              contents: [{ parts }],
               generationConfig: { temperature: 0.7 },
             }),
           }
@@ -290,17 +356,22 @@
         }
         const d = await res.json();
         text = d.candidates?.[0]?.content?.parts?.[0]?.text;
+
       } else {
+        // OpenAI: text + multiple image_url parts
+        const content = [{ type: "text", text: prompt }];
+        images.forEach(img => content.push({
+          type: "image_url",
+          image_url: { url: `data:${img.mime};base64,${img.base64}` },
+        }));
+
         const res = await fetch("https://api.openai.com/v1/chat/completions", {
           method: "POST",
           headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
           body: JSON.stringify({
             model: "gpt-4o",
-            messages: [{ role: "user", content: [
-              { type: "text",      text: prompt },
-              { type: "image_url", image_url: { url: `data:${imgMime};base64,${imgBase64}` } },
-            ]}],
-            max_tokens: 3000,
+            messages: [{ role: "user", content }],
+            max_tokens: 4000,
           }),
         });
         if (!res.ok) {
@@ -327,12 +398,12 @@
     document.getElementById("recipe-box").classList.remove("hidden");
     document.getElementById("saved-ok").classList.add("hidden");
   }
-  function hideRecipe()       { currentRecipe = null; document.getElementById("recipe-box").classList.add("hidden"); }
-  function showError(msg)     { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
-  function hideError()        { document.getElementById("error-box").classList.add("hidden"); }
-  function setLoading(on)     {
+  function hideRecipe()   { currentRecipe = null; document.getElementById("recipe-box").classList.add("hidden"); }
+  function showError(msg) { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
+  function hideError()    { document.getElementById("error-box").classList.add("hidden"); }
+  function setLoading(on) {
     document.getElementById("loading").classList.toggle("hidden", !on);
-    document.getElementById("gen-btn").disabled = on || !imgBase64;
+    document.getElementById("gen-btn").disabled = on || images.length === 0;
   }
 
   // ── Save / History ────────────────────────────────────────────────────────
@@ -351,7 +422,7 @@
   }
 
   function updateBadge() {
-    const n = (LS.get("recipe_history", [])).length;
+    const n = LS.get("recipe_history", []).length;
     const b = document.getElementById("badge");
     b.textContent = n;
     b.classList.toggle("hidden", n === 0);
