@@ -1,0 +1,402 @@
+<!DOCTYPE html>
+<html lang="ja">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0" />
+  <title>マイ冷蔵庫・レシピ提案AI</title>
+  <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdn.jsdelivr.net/npm/marked@9.1.6/marked.min.js"></script>
+  <style>
+    /* Drop zone highlight */
+    .drop-zone { border: 2px dashed #d1d5db; transition: border-color .2s, background-color .2s; }
+    .drop-zone.drag-over { border-color: #f97316; background-color: #fff7ed; }
+
+    /* Markdown recipe styling */
+    .recipe-content h2 { font-size:1.2rem; font-weight:700; margin:1.2rem 0 .4rem; color:#ea580c; }
+    .recipe-content h3 { font-size:1rem;  font-weight:600; margin:.9rem 0 .3rem; color:#374151; }
+    .recipe-content p  { margin:.3rem 0; line-height:1.7; }
+    .recipe-content ul, .recipe-content ol { padding-left:1.5rem; margin:.3rem 0; }
+    .recipe-content li { margin:.15rem 0; line-height:1.6; }
+    .recipe-content hr { margin:1.2rem 0; border-color:#e5e7eb; }
+    .recipe-content strong { color:#1f2937; }
+
+    /* Spinner */
+    @keyframes spin { to { transform:rotate(360deg); } }
+    .spinner { animation:spin 1s linear infinite; }
+
+    /* Active tab */
+    .tab-btn { border-bottom:2px solid transparent; transition:color .15s, border-color .15s; }
+    .tab-btn.active { border-color:#f97316; color:#f97316; font-weight:600; }
+  </style>
+</head>
+<body class="bg-orange-50 min-h-screen font-sans">
+
+  <!-- ▸ Header ────────────────────────────────────────────── -->
+  <header class="bg-white shadow-sm sticky top-0 z-10">
+    <div class="max-w-2xl mx-auto px-4 py-3 flex items-center justify-between">
+      <h1 class="text-xl font-bold text-orange-600">🍱 マイ冷蔵庫・レシピ提案AI</h1>
+      <button onclick="openSettings()" class="p-2 rounded-full hover:bg-gray-100 text-xl" title="設定">⚙️</button>
+    </div>
+    <nav class="max-w-2xl mx-auto px-4 flex border-b border-gray-200 bg-white">
+      <button class="tab-btn active px-4 py-2 text-sm" data-tab="main"    onclick="switchTab('main')">📸 レシピ生成</button>
+      <button class="tab-btn         px-4 py-2 text-sm text-gray-500" data-tab="history" onclick="switchTab('history')">
+        📚 保存済み<span id="badge" class="ml-1 bg-orange-500 text-white text-xs rounded-full px-1.5 hidden"></span>
+      </button>
+    </nav>
+  </header>
+
+  <!-- ▸ Settings Modal ───────────────────────────────────── -->
+  <div id="settings-modal" class="fixed inset-0 bg-black/50 z-50 hidden flex items-center justify-center p-4" onclick="bgClose(event)">
+    <div class="bg-white rounded-2xl p-6 w-full max-w-sm shadow-xl">
+      <div class="flex items-center justify-between mb-5">
+        <h2 class="text-lg font-bold">⚙️ 設定</h2>
+        <button onclick="closeSettings()" class="text-gray-400 hover:text-gray-600 text-3xl leading-none">&times;</button>
+      </div>
+
+      <label class="block text-sm font-medium text-gray-700 mb-1">AIプロバイダー</label>
+      <select id="sel-provider" class="w-full border border-gray-300 rounded-lg px-3 py-2 mb-4 text-sm">
+        <option value="gemini">Gemini 2.5 Flash（推奨・無料枠あり）</option>
+        <option value="openai">OpenAI GPT-4o</option>
+      </select>
+
+      <label class="block text-sm font-medium text-gray-700 mb-1">APIキー</label>
+      <div class="relative mb-1">
+        <input id="inp-key" type="password" placeholder="APIキーを貼り付け"
+          class="w-full border border-gray-300 rounded-lg px-3 py-2 pr-10 text-sm" />
+        <button onclick="toggleEye()" id="eye-btn"
+          class="absolute right-2 top-2 text-gray-400 hover:text-gray-600 text-lg select-none">👁</button>
+      </div>
+      <p class="text-xs text-gray-400 mb-5">このブラウザ内にのみ保存されます。外部送信はされません。</p>
+
+      <button onclick="saveSettings()"
+        class="w-full bg-orange-500 hover:bg-orange-600 text-white font-bold py-2.5 rounded-xl transition">
+        💾 保存する
+      </button>
+      <p id="save-ok" class="mt-2 text-center text-sm text-green-600 hidden">✓ 保存しました！</p>
+    </div>
+  </div>
+
+  <!-- ▸ Main ─────────────────────────────────────────────── -->
+  <main class="max-w-2xl mx-auto px-4 py-6">
+
+    <!-- Tab: Generate -->
+    <div id="tab-main">
+
+      <!-- Upload area -->
+      <div id="drop-zone"
+        class="drop-zone rounded-2xl bg-white p-8 text-center cursor-pointer mb-4 select-none"
+        onclick="document.getElementById('file-input').click()"
+        ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
+        <div id="up-placeholder">
+          <div class="text-6xl mb-3">📷</div>
+          <p class="text-gray-600 font-medium">ここをタップして写真を選択</p>
+          <p class="text-gray-400 text-sm mt-1">またはドラッグ＆ドロップ</p>
+          <p class="text-gray-400 text-xs mt-2">JPG / PNG / WebP 対応</p>
+        </div>
+        <img id="preview" src="" alt="" class="hidden max-h-72 mx-auto rounded-xl object-contain pointer-events-none" />
+      </div>
+
+      <input id="file-input" type="file" accept="image/*" class="hidden" onchange="onFileSelect(event)" />
+
+      <!-- Clear button -->
+      <div class="flex gap-3 mb-4">
+        <button onclick="document.getElementById('file-input').click()"
+          class="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2.5 rounded-xl hover:bg-gray-50 transition text-sm">
+          🖼️ 画像を選択 / カメラ
+        </button>
+        <button id="clear-btn" onclick="clearImage()"
+          class="hidden bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm">
+          ✕ クリア
+        </button>
+      </div>
+
+      <!-- Generate button -->
+      <button id="gen-btn" onclick="generate()" disabled
+        class="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
+        🍳 レシピを生成する
+      </button>
+
+      <!-- Loading -->
+      <div id="loading" class="hidden text-center py-12">
+        <div class="inline-block w-14 h-14 border-4 border-orange-500 border-t-transparent rounded-full spinner mb-4"></div>
+        <p class="text-gray-600 font-medium">AIがレシピを考えています…</p>
+        <p class="text-gray-400 text-sm mt-1">少々お待ちください（10〜30秒）</p>
+      </div>
+
+      <!-- Error -->
+      <div id="error-box" class="hidden mt-4 bg-red-50 border border-red-200 rounded-xl p-4">
+        <p id="error-msg" class="text-red-700 text-sm font-medium"></p>
+      </div>
+
+      <!-- Recipe result -->
+      <div id="recipe-box" class="hidden mt-6">
+        <div class="flex items-center justify-between mb-3">
+          <h2 class="text-lg font-bold text-gray-800">🍽️ 提案されたレシピ</h2>
+          <button onclick="saveRecipe()"
+            class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow">
+            ⭐ 保存
+          </button>
+        </div>
+        <div id="recipe-content" class="recipe-content bg-white rounded-2xl p-5 shadow-sm leading-relaxed"></div>
+        <p id="saved-ok" class="mt-2 text-center text-sm text-green-600 hidden">⭐ お気に入りに保存しました！</p>
+      </div>
+
+    </div>
+
+    <!-- Tab: History -->
+    <div id="tab-history" class="hidden">
+      <div class="flex items-center justify-between mb-4">
+        <h2 class="text-lg font-bold text-gray-800">📚 保存済みレシピ</h2>
+        <button onclick="clearAll()" class="text-sm text-red-400 hover:text-red-600 transition">全削除</button>
+      </div>
+      <div id="history-list"></div>
+    </div>
+
+  </main>
+
+  <script>
+  // ── Storage ───────────────────────────────────────────────────────────────
+  const LS = {
+    get(k, d = null) { try { const v = localStorage.getItem(k); return v !== null ? JSON.parse(v) : d; } catch { return d; } },
+    set(k, v)        { try { localStorage.setItem(k, JSON.stringify(v)); } catch { alert("LocalStorageへの保存に失敗しました。"); } },
+  };
+
+  // ── State ─────────────────────────────────────────────────────────────────
+  let imgBase64 = null, imgMime = null, currentRecipe = null;
+
+  // ── Boot ──────────────────────────────────────────────────────────────────
+  window.addEventListener("DOMContentLoaded", () => {
+    document.getElementById("sel-provider").value = LS.get("provider", "gemini");
+    document.getElementById("inp-key").value       = LS.get("api_key", "");
+    updateBadge();
+  });
+
+  // ── Tabs ──────────────────────────────────────────────────────────────────
+  function switchTab(tab) {
+    ["main","history"].forEach(t => document.getElementById("tab-"+t).classList.toggle("hidden", t !== tab));
+    document.querySelectorAll(".tab-btn").forEach(b => {
+      b.classList.toggle("active",       b.dataset.tab === tab);
+      b.classList.toggle("text-gray-500", b.dataset.tab !== tab);
+    });
+    if (tab === "history") renderHistory();
+  }
+
+  // ── Settings ──────────────────────────────────────────────────────────────
+  function openSettings()  { document.getElementById("settings-modal").classList.remove("hidden"); document.getElementById("save-ok").classList.add("hidden"); }
+  function closeSettings() { document.getElementById("settings-modal").classList.add("hidden"); }
+  function bgClose(e)      { if (e.target === document.getElementById("settings-modal")) closeSettings(); }
+  function toggleEye() {
+    const i = document.getElementById("inp-key");
+    i.type = i.type === "password" ? "text" : "password";
+    document.getElementById("eye-btn").textContent = i.type === "password" ? "👁" : "🙈";
+  }
+  function saveSettings() {
+    LS.set("api_key",  document.getElementById("inp-key").value.trim());
+    LS.set("provider", document.getElementById("sel-provider").value);
+    document.getElementById("save-ok").classList.remove("hidden");
+    setTimeout(closeSettings, 700);
+  }
+
+  // ── Image ─────────────────────────────────────────────────────────────────
+  function onFileSelect(e) { const f = e.target.files[0]; if (f) loadImage(f); }
+  function onDragOver(e)   { e.preventDefault(); document.getElementById("drop-zone").classList.add("drag-over"); }
+  function onDragLeave()   { document.getElementById("drop-zone").classList.remove("drag-over"); }
+  function onDrop(e) {
+    e.preventDefault();
+    document.getElementById("drop-zone").classList.remove("drag-over");
+    const f = e.dataTransfer?.files[0];
+    if (f && f.type.startsWith("image/")) loadImage(f);
+  }
+  function loadImage(file) {
+    imgMime = file.type || "image/jpeg";
+    const r = new FileReader();
+    r.onload = ev => {
+      imgBase64 = ev.target.result.split(",")[1];
+      document.getElementById("preview").src = ev.target.result;
+      document.getElementById("preview").classList.remove("hidden");
+      document.getElementById("up-placeholder").classList.add("hidden");
+      document.getElementById("gen-btn").disabled = false;
+      document.getElementById("clear-btn").classList.remove("hidden");
+      hideRecipe(); hideError();
+    };
+    r.readAsDataURL(file);
+  }
+  function clearImage() {
+    imgBase64 = imgMime = null;
+    document.getElementById("preview").src = "";
+    document.getElementById("preview").classList.add("hidden");
+    document.getElementById("up-placeholder").classList.remove("hidden");
+    document.getElementById("gen-btn").disabled = true;
+    document.getElementById("clear-btn").classList.add("hidden");
+    document.getElementById("file-input").value = "";
+    hideRecipe(); hideError();
+  }
+
+  // ── Generate ──────────────────────────────────────────────────────────────
+  async function generate() {
+    const apiKey   = LS.get("api_key", "");
+    const provider = LS.get("provider", "gemini");
+    if (!apiKey)   { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
+    if (!imgBase64) { showError("画像をアップロードしてください。"); return; }
+
+    hideRecipe(); hideError();
+    setLoading(true);
+
+    const prompt = `この画像に写っている食材をすべて識別してください。
+次に、それらの食材を使った料理を3つ提案してください。
+各レシピは必ず以下の形式で出力してください：
+
+---
+## 【料理名】
+**調理時間**: XX分
+
+### 材料（2人分）
+- 材料名: 分量
+
+### 作り方
+1. ステップ1
+2. ステップ2
+---
+
+日本語で答えてください。`;
+
+    try {
+      let text;
+      if (provider === "gemini") {
+        const res = await fetch(
+          `https://generativelanguage.googleapis.com/v1beta/models/gemini-2.5-flash:generateContent?key=${apiKey}`,
+          {
+            method: "POST",
+            headers: { "Content-Type": "application/json" },
+            body: JSON.stringify({
+              contents: [{ parts: [
+                { text: prompt },
+                { inline_data: { mime_type: imgMime, data: imgBase64 } },
+              ]}],
+              generationConfig: { temperature: 0.7 },
+            }),
+          }
+        );
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(`Gemini APIエラー (${res.status}): ${e?.error?.message || res.statusText}`);
+        }
+        const d = await res.json();
+        text = d.candidates?.[0]?.content?.parts?.[0]?.text;
+      } else {
+        const res = await fetch("https://api.openai.com/v1/chat/completions", {
+          method: "POST",
+          headers: { "Content-Type": "application/json", "Authorization": `Bearer ${apiKey}` },
+          body: JSON.stringify({
+            model: "gpt-4o",
+            messages: [{ role: "user", content: [
+              { type: "text",      text: prompt },
+              { type: "image_url", image_url: { url: `data:${imgMime};base64,${imgBase64}` } },
+            ]}],
+            max_tokens: 3000,
+          }),
+        });
+        if (!res.ok) {
+          const e = await res.json().catch(() => ({}));
+          throw new Error(`OpenAI APIエラー (${res.status}): ${e?.error?.message || res.statusText}`);
+        }
+        const d = await res.json();
+        text = d.choices?.[0]?.message?.content;
+      }
+
+      if (!text) throw new Error("AIからの返答が空でした。もう一度お試しください。");
+      currentRecipe = text;
+      showRecipe(text);
+    } catch (e) {
+      showError(e.message || "不明なエラーが発生しました。");
+    } finally {
+      setLoading(false);
+    }
+  }
+
+  // ── Display helpers ───────────────────────────────────────────────────────
+  function showRecipe(text) {
+    document.getElementById("recipe-content").innerHTML = marked.parse(text);
+    document.getElementById("recipe-box").classList.remove("hidden");
+    document.getElementById("saved-ok").classList.add("hidden");
+  }
+  function hideRecipe()       { currentRecipe = null; document.getElementById("recipe-box").classList.add("hidden"); }
+  function showError(msg)     { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
+  function hideError()        { document.getElementById("error-box").classList.add("hidden"); }
+  function setLoading(on)     {
+    document.getElementById("loading").classList.toggle("hidden", !on);
+    document.getElementById("gen-btn").disabled = on || !imgBase64;
+  }
+
+  // ── Save / History ────────────────────────────────────────────────────────
+  function saveRecipe() {
+    if (!currentRecipe) return;
+    const history = LS.get("recipe_history", []);
+    const now = new Date();
+    history.unshift({
+      id:      now.getTime().toString(),
+      date:    now.toLocaleDateString("ja-JP", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }),
+      content: currentRecipe,
+    });
+    LS.set("recipe_history", history.slice(0, 50));
+    document.getElementById("saved-ok").classList.remove("hidden");
+    updateBadge();
+  }
+
+  function updateBadge() {
+    const n = (LS.get("recipe_history", [])).length;
+    const b = document.getElementById("badge");
+    b.textContent = n;
+    b.classList.toggle("hidden", n === 0);
+  }
+
+  function renderHistory() {
+    const history = LS.get("recipe_history", []);
+    const el = document.getElementById("history-list");
+    if (!history.length) {
+      el.innerHTML = `<div class="text-center py-16 text-gray-400">
+        <div class="text-6xl mb-3">📭</div>
+        <p class="font-medium">保存されたレシピはありません</p>
+        <p class="text-sm mt-1">レシピを生成して「⭐ 保存」を押してください</p>
+      </div>`;
+      return;
+    }
+    el.innerHTML = history.map((entry, i) => `
+      <div class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
+        <button class="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+          onclick="toggleItem('body-${entry.id}','arr-${entry.id}')">
+          <div>
+            <span class="font-medium text-gray-800">⭐ レシピ ${history.length - i}</span>
+            <span class="ml-2 text-xs text-gray-400">${entry.date}</span>
+          </div>
+          <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200">▼</span>
+        </button>
+        <div id="body-${entry.id}" class="hidden px-5 pb-5 border-t border-gray-100">
+          <div class="recipe-content text-sm mt-4">${marked.parse(entry.content)}</div>
+          <button onclick="deleteItem('${entry.id}')"
+            class="mt-4 text-xs text-red-400 hover:text-red-600 transition">🗑️ この項目を削除</button>
+        </div>
+      </div>`).join("");
+  }
+
+  function toggleItem(bodyId, arrId) {
+    const body = document.getElementById(bodyId);
+    const arr  = document.getElementById(arrId);
+    const open = body.classList.toggle("hidden");
+    if (arr) arr.style.transform = open ? "" : "rotate(180deg)";
+  }
+
+  function deleteItem(id) {
+    if (!confirm("このレシピを削除しますか？")) return;
+    LS.set("recipe_history", LS.get("recipe_history", []).filter(h => h.id !== id));
+    updateBadge(); renderHistory();
+  }
+
+  function clearAll() {
+    if (!confirm("保存済みレシピをすべて削除しますか？")) return;
+    LS.set("recipe_history", []);
+    updateBadge(); renderHistory();
+  }
+  </script>
+</body>
+</html>
