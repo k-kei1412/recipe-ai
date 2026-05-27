@@ -85,7 +85,7 @@
       <!-- Upload area -->
       <div id="drop-zone"
         class="drop-zone rounded-2xl bg-white p-8 text-center cursor-pointer mb-4 select-none"
-        onclick="document.getElementById('file-input').click()"
+        onclick="document.getElementById('camera-input').click()"
         ondragover="onDragOver(event)" ondragleave="onDragLeave()" ondrop="onDrop(event)">
         <div id="up-placeholder">
           <div class="text-6xl mb-3">📷</div>
@@ -96,17 +96,24 @@
         <img id="preview" src="" alt="" class="hidden max-h-72 mx-auto rounded-xl object-contain pointer-events-none" />
       </div>
 
+      <!-- file picker（ギャラリーから選択） -->
       <input id="file-input" type="file" accept="image/*" class="hidden" onchange="onFileSelect(event)" />
+      <!-- camera（直接カメラ起動） -->
+      <input id="camera-input" type="file" accept="image/*" capture="environment" class="hidden" onchange="onFileSelect(event)" />
 
-      <!-- Clear button -->
+      <!-- Buttons row -->
       <div class="flex gap-3 mb-4">
+        <button onclick="document.getElementById('camera-input').click()"
+          class="flex-1 bg-orange-500 hover:bg-orange-600 text-white font-bold py-3 rounded-xl transition text-sm shadow">
+          📷 カメラで撮影
+        </button>
         <button onclick="document.getElementById('file-input').click()"
-          class="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-2.5 rounded-xl hover:bg-gray-50 transition text-sm">
-          🖼️ 画像を選択 / カメラ
+          class="flex-1 bg-white border border-gray-300 text-gray-700 font-medium py-3 rounded-xl hover:bg-gray-50 transition text-sm">
+          🖼️ アルバムから選択
         </button>
         <button id="clear-btn" onclick="clearImage()"
-          class="hidden bg-white border border-gray-300 text-gray-500 px-4 py-2.5 rounded-xl hover:bg-gray-50 transition text-sm">
-          ✕ クリア
+          class="hidden bg-white border border-gray-300 text-gray-500 px-4 py-3 rounded-xl hover:bg-gray-50 transition text-sm">
+          ✕
         </button>
       </div>
 
