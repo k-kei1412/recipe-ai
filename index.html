@@ -188,15 +188,15 @@
         </button>
       </div>
 
-      <!-- Extra ingredients input -->
+      <!-- Extra ingredients / requests input -->
       <div class="bg-white rounded-2xl p-4 mb-4 shadow-sm">
         <label class="block text-sm font-semibold text-gray-700 mb-1">
-          📝 写真に写っていない食材・調味料を追加
+          📝 追加食材・リクエスト・コメント
         </label>
-        <textarea id="extra-ingredients" rows="2"
-          placeholder="例: 白米 2合、醤油 大さじ2、みりん、砂糖、卵 2個"
+        <textarea id="extra-ingredients" rows="3"
+          placeholder="例：&#10;・白米 2合、醤油 大さじ2、卵 2個（手元にある食材）&#10;・鶏肉は必ず使ってほしい&#10;・辛めの味付けにしてほしい、揚げ物は避けたい"
           class="w-full border border-gray-200 rounded-xl px-3 py-2 text-sm resize-none focus:outline-none focus:ring-2 focus:ring-orange-300"></textarea>
-        <p class="text-xs text-gray-400 mt-1">カンマ区切りで複数入力できます。空欄でも問題ありません。</p>
+        <p class="text-xs text-gray-400 mt-1">食材の追加だけでなく、好みや要望も自由に書いてください。空欄でも問題ありません。</p>
       </div>
 
       <!-- Serving size selector -->
@@ -239,7 +239,7 @@
       <div id="recipe-box" class="hidden mt-6">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-bold text-gray-800">🍽️ 提案されたレシピ</h2>
-          <button onclick="saveRecipe()"
+          <button id="save-btn" onclick="saveRecipe()"
             class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow">
             ⭐ 保存
           </button>
@@ -281,6 +281,7 @@
   let images        = [];
   let currentRecipe = null;
   let currentMode   = null;
+  let recipeSaved   = false;
   let servings      = 2;
   let historyFilter = "";
 
@@ -432,13 +433,14 @@
     if (!apiKey)             { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
     if (images.length === 0) { showError("画像をアップロードしてください。"); return; }
 
-    currentMode = mode;
+    currentMode  = mode;
+    recipeSaved  = false;
     hideRecipe(); hideError();
     setLoading(true);
 
     const extra     = document.getElementById("extra-ingredients").value.trim();
     const extraLine = extra
-      ? `\nまた、以下の食材・調味料も手元にあります（写真には写っていません）：\n${extra}\n`
+      ? `\n追加情報（手元にある食材・好み・リクエストなど）：\n${extra}\n`
       : "";
 
     const stepNote = `各ステップには「食材名と具体的な分量」「調理器具」「火加減（強火・中火・弱火など）」「加熱時間の目安」を必ず明記してください。`;
@@ -447,7 +449,8 @@
 
     if (mode === "bento") {
       prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
-それらの食材を使った**お弁当のおかず**を3品提案してください。
+それらの食材を参考にした**お弁当のおかず**を3品提案してください。
+すべての食材を必ず使い切る必要はありません。使えそうな食材があれば積極的に活用してください。
 
 お弁当おかずの条件：
 - 冷めても美味しく食べられる
@@ -479,7 +482,8 @@ ${stepNote}
 
     } else {
       prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
-それらすべての食材を活用した料理を3つ提案してください。
+それらの食材を参考にして、作りやすい料理を3つ提案してください。
+すべての食材を必ず使い切る必要はありません。使えそうな食材があれば積極的に活用してください。
 
 各レシピは必ず以下の形式で出力してください：
 
@@ -567,11 +571,26 @@ ${stepNote}
     document.getElementById("recipe-content").innerHTML = marked.parse(text);
     document.getElementById("recipe-box").classList.remove("hidden");
     document.getElementById("saved-ok").classList.add("hidden");
+    resetSaveBtn();
   }
   function hideRecipe() {
     currentRecipe = null;
     currentMode   = null;
     document.getElementById("recipe-box").classList.add("hidden");
+  }
+  function resetSaveBtn() {
+    const btn = document.getElementById("save-btn");
+    btn.disabled  = false;
+    btn.textContent = "⭐ 保存";
+    btn.className = "bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow";
+    btn.onclick   = saveRecipe;
+  }
+  function markSaveBtn() {
+    const btn = document.getElementById("save-btn");
+    btn.disabled  = true;
+    btn.textContent = "✓ 保存済み";
+    btn.className = "bg-gray-200 text-gray-500 font-bold px-4 py-2 rounded-xl text-sm cursor-not-allowed";
+    btn.onclick   = null;
   }
   function showError(msg) { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
   function hideError()    { document.getElementById("error-box").classList.add("hidden"); }
@@ -584,7 +603,7 @@ ${stepNote}
 
   // ── Save / History ────────────────────────────────────────────────────────
   async function saveRecipe() {
-    if (!currentRecipe) return;
+    if (!currentRecipe || recipeSaved) return;
 
     const thumbnail = images.length > 0 ? await compressThumb(images[0].dataUrl) : null;
     const tags      = extractTags(currentRecipe);
@@ -597,11 +616,14 @@ ${stepNote}
       content:   currentRecipe,
       thumbnail,
       tags,
+      title:     "",
       servings,
-      mode: currentMode || "recipe",
+      mode:      currentMode || "recipe",
     });
 
     LS.set("recipe_history", history.slice(0, 50));
+    recipeSaved = true;
+    markSaveBtn();
     document.getElementById("saved-ok").classList.remove("hidden");
     updateBadge();
   }
@@ -654,6 +676,8 @@ ${stepNote}
       const histIdx   = history.indexOf(entry);
       const displayNum = history.length - histIdx;
 
+      const displayTitle = entry.title || `${modeEmoji} ${modeLabel} ${displayNum}`;
+
       return `
       <div class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
         <button class="w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition"
@@ -661,7 +685,9 @@ ${stepNote}
           ${thumbHtml}
           <div class="flex-1 min-w-0">
             <div class="flex items-center gap-2 flex-wrap">
-              <span class="font-medium text-gray-800">${modeEmoji} ${modeLabel} ${displayNum}</span>
+              <span class="font-medium text-gray-800">${displayTitle}</span>
+              <button onclick="editTitle('${entry.id}');event.stopPropagation();"
+                class="text-gray-300 hover:text-orange-400 transition text-xs px-0.5" title="名前を変更">✏️</button>
               ${srvLabel ? `<span class="text-xs text-orange-500 font-semibold">${srvLabel}</span>` : ""}
               <span class="text-xs text-gray-400">${entry.date}</span>
             </div>
@@ -683,6 +709,17 @@ ${stepNote}
     const arr  = document.getElementById(arrId);
     const open = body.classList.toggle("hidden");
     if (arr) arr.style.transform = open ? "" : "rotate(180deg)";
+  }
+
+  function editTitle(id) {
+    const history = LS.get("recipe_history", []);
+    const entry   = history.find(h => h.id === id);
+    if (!entry) return;
+    const newTitle = prompt("レシピ名を入力してください（空白で自動名称に戻す）", entry.title || "");
+    if (newTitle === null) return;
+    entry.title = newTitle.trim();
+    LS.set("recipe_history", history);
+    renderHistory();
   }
 
   function deleteItem(id) {
