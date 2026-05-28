@@ -10,12 +10,46 @@
     .drop-zone { border: 2px dashed #d1d5db; transition: border-color .2s, background-color .2s; }
     .drop-zone.drag-over { border-color: #f97316; background-color: #fff7ed; }
 
-    .recipe-content h2 { font-size:1.2rem; font-weight:700; margin:1.2rem 0 .4rem; color:#ea580c; }
-    .recipe-content h3 { font-size:1rem;  font-weight:600; margin:.9rem 0 .3rem; color:#374151; }
-    .recipe-content p  { margin:.3rem 0; line-height:1.7; }
-    .recipe-content ul, .recipe-content ol { padding-left:1.5rem; margin:.3rem 0; }
-    .recipe-content li { margin:.2rem 0; line-height:1.7; }
-    .recipe-content hr { margin:1.2rem 0; border-color:#e5e7eb; }
+    .recipe-content h2 { font-size:1.2rem; font-weight:700; margin:1.4rem 0 .5rem; color:#ea580c; }
+    .recipe-content h3 { font-size:1rem;  font-weight:600; margin:1rem 0 .4rem; color:#374151; }
+    .recipe-content p  { margin:.4rem 0; line-height:1.7; }
+    .recipe-content ul { padding-left:1.5rem; margin:.4rem 0; }
+    .recipe-content ul li { margin:.3rem 0; line-height:1.7; }
+
+    /* ── 調理ステップ: 番号バッジ付きカード ── */
+    .recipe-content ol {
+      padding-left: 0;
+      margin: .6rem 0;
+      list-style: none;
+      counter-reset: step-counter;
+    }
+    .recipe-content ol li {
+      counter-increment: step-counter;
+      position: relative;
+      margin: 1rem 0;
+      padding: .8rem 1rem .8rem 3.2rem;
+      background: #fff7ed;
+      border-left: 4px solid #f97316;
+      border-radius: 0 .75rem .75rem 0;
+      line-height: 1.8;
+    }
+    .recipe-content ol li::before {
+      content: counter(step-counter);
+      position: absolute;
+      left: .65rem;
+      top: .8rem;
+      background: #f97316;
+      color: white;
+      font-weight: 700;
+      font-size: .7rem;
+      width: 1.4rem;
+      height: 1.4rem;
+      border-radius: 50%;
+      text-align: center;
+      line-height: 1.4rem;
+    }
+
+    .recipe-content hr { margin:1.6rem 0; border-color:#e5e7eb; }
     .recipe-content strong { color:#1f2937; }
 
     @keyframes spin { to { transform:rotate(360deg); } }
@@ -28,6 +62,43 @@
     .thumb-del { position:absolute; top:-6px; right:-6px; width:22px; height:22px;
       background:#ef4444; color:#fff; border-radius:50%; font-size:14px; line-height:22px;
       text-align:center; cursor:pointer; font-weight:bold; box-shadow:0 1px 3px rgba(0,0,0,.3); }
+
+    /* ── 人数ボタン ── */
+    .serving-btn {
+      flex: 1;
+      padding: .4rem 0;
+      border: 2px solid #e5e7eb;
+      border-radius: .5rem;
+      text-align: center;
+      font-size: .875rem;
+      transition: all .15s;
+      cursor: pointer;
+      background: white;
+      color: #374151;
+    }
+    .serving-btn.active {
+      border-color: #f97316;
+      background: #fff7ed;
+      color: #f97316;
+      font-weight: 700;
+    }
+
+    /* ── タグバッジ ── */
+    .tag-badge {
+      display: inline-block;
+      padding: .15rem .5rem;
+      background: #fff7ed;
+      color: #f97316;
+      border: 1px solid #fed7aa;
+      border-radius: 9999px;
+      font-size: .7rem;
+      font-weight: 600;
+    }
+    .tag-badge.bento {
+      background: #f0fdf4;
+      color: #16a34a;
+      border-color: #bbf7d0;
+    }
   </style>
 </head>
 <body class="bg-orange-50 min-h-screen font-sans">
@@ -128,11 +199,29 @@
         <p class="text-xs text-gray-400 mt-1">カンマ区切りで複数入力できます。空欄でも問題ありません。</p>
       </div>
 
-      <!-- Generate button -->
-      <button id="gen-btn" onclick="generate()" disabled
-        class="w-full bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-lg transition shadow-md">
-        🍳 レシピを生成する
-      </button>
+      <!-- Serving size selector -->
+      <div class="bg-white rounded-2xl p-4 mb-4 shadow-sm">
+        <label class="block text-sm font-semibold text-gray-700 mb-2">👥 人数</label>
+        <div class="flex gap-2">
+          <button class="serving-btn" data-n="1" onclick="setServings(1)">1人</button>
+          <button class="serving-btn active" data-n="2" onclick="setServings(2)">2人</button>
+          <button class="serving-btn" data-n="3" onclick="setServings(3)">3人</button>
+          <button class="serving-btn" data-n="4" onclick="setServings(4)">4人</button>
+          <button class="serving-btn" data-n="5" onclick="setServings(5)">5人</button>
+        </div>
+      </div>
+
+      <!-- Generate buttons -->
+      <div class="flex gap-3 mb-2">
+        <button id="gen-btn" onclick="generate('recipe')" disabled
+          class="flex-1 bg-orange-500 hover:bg-orange-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-base transition shadow-md">
+          🍳 レシピを生成する
+        </button>
+        <button id="bento-btn" onclick="generate('bento')" disabled
+          class="flex-1 bg-green-500 hover:bg-green-600 disabled:bg-gray-300 disabled:cursor-not-allowed text-white font-bold py-4 rounded-2xl text-base transition shadow-md">
+          🍱 弁当おかず
+        </button>
+      </div>
 
       <!-- Loading -->
       <div id="loading" class="hidden text-center py-12">
@@ -163,10 +252,19 @@
 
     <!-- Tab: History -->
     <div id="tab-history" class="hidden">
-      <div class="flex items-center justify-between mb-4">
+      <div class="flex items-center justify-between mb-3">
         <h2 class="text-lg font-bold text-gray-800">📚 保存済みレシピ</h2>
         <button onclick="clearAll()" class="text-sm text-red-400 hover:text-red-600 transition">全削除</button>
       </div>
+
+      <!-- Search bar -->
+      <div class="relative mb-4">
+        <span class="absolute left-3 top-1/2 -translate-y-1/2 text-gray-400 text-sm">🔍</span>
+        <input id="search-input" type="text" placeholder="料理名・タグで検索…"
+          oninput="onSearch(this.value)"
+          class="w-full border border-gray-200 rounded-xl pl-9 pr-4 py-2.5 text-sm bg-white focus:outline-none focus:ring-2 focus:ring-orange-300" />
+      </div>
+
       <div id="history-list"></div>
     </div>
 
@@ -180,9 +278,11 @@
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
-  // images: [{base64, mime, dataUrl}]
-  let images = [];
+  let images        = [];
   let currentRecipe = null;
+  let currentMode   = null;
+  let servings      = 2;
+  let historyFilter = "";
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   window.addEventListener("DOMContentLoaded", () => {
@@ -217,11 +317,19 @@
     setTimeout(closeSettings, 700);
   }
 
+  // ── Servings ──────────────────────────────────────────────────────────────
+  function setServings(n) {
+    servings = n;
+    document.querySelectorAll(".serving-btn").forEach(b => {
+      b.classList.toggle("active", +b.dataset.n === n);
+    });
+  }
+
   // ── Image handling ────────────────────────────────────────────────────────
   function onFileSelect(e) {
     const files = Array.from(e.target.files);
     files.forEach(f => loadImage(f));
-    e.target.value = ""; // allow re-selecting same file
+    e.target.value = "";
   }
   function onDragOver(e)   { e.preventDefault(); document.getElementById("drop-zone").classList.add("drag-over"); }
   function onDragLeave()   { document.getElementById("drop-zone").classList.remove("drag-over"); }
@@ -289,25 +397,88 @@
   }
 
   function updateGenBtn() {
-    document.getElementById("gen-btn").disabled = images.length === 0;
+    const dis = images.length === 0;
+    document.getElementById("gen-btn").disabled   = dis;
+    document.getElementById("bento-btn").disabled = dis;
+  }
+
+  // ── Thumbnail compression ─────────────────────────────────────────────────
+  function compressThumb(dataUrl, size = 80) {
+    return new Promise(resolve => {
+      const img = new Image();
+      img.onload = () => {
+        const c = document.createElement("canvas");
+        const r = Math.min(size / img.width, size / img.height);
+        c.width  = Math.round(img.width * r);
+        c.height = Math.round(img.height * r);
+        c.getContext("2d").drawImage(img, 0, 0, c.width, c.height);
+        resolve(c.toDataURL("image/jpeg", 0.6));
+      };
+      img.onerror = () => resolve(null);
+      img.src = dataUrl;
+    });
+  }
+
+  // ── Tag extraction (from 【料理名】 pattern) ──────────────────────────────
+  function extractTags(content) {
+    const matches = content.match(/【([^】]+)】/g) || [];
+    return [...new Set(matches.map(m => m.replace(/[【】]/g, "").trim()))].slice(0, 5);
   }
 
   // ── Generate ──────────────────────────────────────────────────────────────
-  async function generate() {
+  async function generate(mode) {
     const apiKey   = LS.get("api_key", "");
     const provider = LS.get("provider", "gemini");
-    if (!apiKey)         { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
+    if (!apiKey)             { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
     if (images.length === 0) { showError("画像をアップロードしてください。"); return; }
 
+    currentMode = mode;
     hideRecipe(); hideError();
     setLoading(true);
 
-    const extra = document.getElementById("extra-ingredients").value.trim();
+    const extra     = document.getElementById("extra-ingredients").value.trim();
     const extraLine = extra
       ? `\nまた、以下の食材・調味料も手元にあります（写真には写っていません）：\n${extra}\n`
       : "";
 
-    const prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
+    const stepNote = `各ステップには「食材名と具体的な分量」「調理器具」「火加減（強火・中火・弱火など）」「加熱時間の目安」を必ず明記してください。`;
+
+    let prompt;
+
+    if (mode === "bento") {
+      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
+それらの食材を使った**お弁当のおかず**を3品提案してください。
+
+お弁当おかずの条件：
+- 冷めても美味しく食べられる
+- 当日の朝に20分以内で作れる
+- 彩りよく盛り付けられる
+- ${servings}人分のお弁当に適した量
+
+各レシピは必ず以下の形式で出力してください：
+
+---
+## 【おかず名】
+**調理時間**: XX分
+
+### 材料（${servings}人分）
+- 食材名: 分量（例: 鶏もも肉 200g）
+
+### 作り方
+${stepNote}
+
+1. Step 1: （具体的な内容）
+2. Step 2: （具体的な内容）
+（以下続く）
+
+### お弁当のコツ
+- 冷まし方・保存のポイントを1〜2行で補足
+---
+
+日本語で答えてください。`;
+
+    } else {
+      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
 それらすべての食材を活用した料理を3つ提案してください。
 
 各レシピは必ず以下の形式で出力してください：
@@ -316,12 +487,12 @@
 ## 【料理名】
 **調理時間**: XX分
 
-### 材料（2人分）
+### 材料（${servings}人分）
 - 食材名: 分量（例: 豚こま切れ肉 250g）
 
 ### 作り方
-各ステップには「食材名と具体的な分量」「調理器具」「火加減（強火・中火・弱火など）」「加熱時間の目安」を必ず明記してください。
-例のような形式で書いてください：
+${stepNote}
+例：
 「Step 1: フライパンにサラダ油 大さじ1（約12g）をひき、中火で30秒ほど熱する。」
 「Step 2: 豚こま切れ肉 250gを広げて入れ、触らずに2〜3分焼いて焼き色をつける。裏返してさらに1〜2分焼く。」
 
@@ -331,11 +502,11 @@
 ---
 
 日本語で答えてください。`;
+    }
 
     try {
       let text;
       if (provider === "gemini") {
-        // Build parts: text first, then all images
         const parts = [{ text: prompt }];
         images.forEach(img => parts.push({ inline_data: { mime_type: img.mime, data: img.base64 } }));
 
@@ -358,7 +529,6 @@
         text = d.candidates?.[0]?.content?.parts?.[0]?.text;
 
       } else {
-        // OpenAI: text + multiple image_url parts
         const content = [{ type: "text", text: prompt }];
         images.forEach(img => content.push({
           type: "image_url",
@@ -398,24 +568,39 @@
     document.getElementById("recipe-box").classList.remove("hidden");
     document.getElementById("saved-ok").classList.add("hidden");
   }
-  function hideRecipe()   { currentRecipe = null; document.getElementById("recipe-box").classList.add("hidden"); }
+  function hideRecipe() {
+    currentRecipe = null;
+    currentMode   = null;
+    document.getElementById("recipe-box").classList.add("hidden");
+  }
   function showError(msg) { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
   function hideError()    { document.getElementById("error-box").classList.add("hidden"); }
   function setLoading(on) {
     document.getElementById("loading").classList.toggle("hidden", !on);
-    document.getElementById("gen-btn").disabled = on || images.length === 0;
+    const dis = on || images.length === 0;
+    document.getElementById("gen-btn").disabled   = dis;
+    document.getElementById("bento-btn").disabled = dis;
   }
 
   // ── Save / History ────────────────────────────────────────────────────────
-  function saveRecipe() {
+  async function saveRecipe() {
     if (!currentRecipe) return;
-    const history = LS.get("recipe_history", []);
-    const now = new Date();
+
+    const thumbnail = images.length > 0 ? await compressThumb(images[0].dataUrl) : null;
+    const tags      = extractTags(currentRecipe);
+    const history   = LS.get("recipe_history", []);
+    const now       = new Date();
+
     history.unshift({
-      id:      now.getTime().toString(),
-      date:    now.toLocaleDateString("ja-JP", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }),
-      content: currentRecipe,
+      id:        now.getTime().toString(),
+      date:      now.toLocaleDateString("ja-JP", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }),
+      content:   currentRecipe,
+      thumbnail,
+      tags,
+      servings,
+      mode: currentMode || "recipe",
     });
+
     LS.set("recipe_history", history.slice(0, 50));
     document.getElementById("saved-ok").classList.remove("hidden");
     updateBadge();
@@ -428,33 +613,69 @@
     b.classList.toggle("hidden", n === 0);
   }
 
+  // ── Search ────────────────────────────────────────────────────────────────
+  function onSearch(val) {
+    historyFilter = val.toLowerCase().trim();
+    renderHistory();
+  }
+
+  // ── Render History ────────────────────────────────────────────────────────
   function renderHistory() {
     const history = LS.get("recipe_history", []);
     const el = document.getElementById("history-list");
-    if (!history.length) {
+
+    const filtered = historyFilter
+      ? history.filter(e =>
+          e.content.toLowerCase().includes(historyFilter) ||
+          (e.tags || []).some(t => t.toLowerCase().includes(historyFilter))
+        )
+      : history;
+
+    if (!filtered.length) {
       el.innerHTML = `<div class="text-center py-16 text-gray-400">
-        <div class="text-6xl mb-3">📭</div>
-        <p class="font-medium">保存されたレシピはありません</p>
-        <p class="text-sm mt-1">レシピを生成して「⭐ 保存」を押してください</p>
+        <div class="text-6xl mb-3">${historyFilter ? "🔍" : "📭"}</div>
+        <p class="font-medium">${historyFilter ? "一致するレシピが見つかりません" : "保存されたレシピはありません"}</p>
+        <p class="text-sm mt-1">${historyFilter ? "別のキーワードで検索してください" : "レシピを生成して「⭐ 保存」を押してください"}</p>
       </div>`;
       return;
     }
-    el.innerHTML = history.map((entry, i) => `
+
+    el.innerHTML = filtered.map(entry => {
+      const isBento   = entry.mode === "bento";
+      const modeEmoji = isBento ? "🍱" : "🍳";
+      const modeLabel = isBento ? "弁当おかず" : "レシピ";
+      const srvLabel  = entry.servings ? `${entry.servings}人分` : "";
+      const tagHtml   = (entry.tags || []).map(t =>
+        `<span class="tag-badge${isBento ? " bento" : ""}">${t}</span>`
+      ).join(" ");
+      const thumbHtml = entry.thumbnail
+        ? `<img src="${entry.thumbnail}" class="w-12 h-12 object-cover rounded-lg border border-gray-200 shadow-sm flex-shrink-0" />`
+        : `<div class="w-12 h-12 rounded-lg bg-orange-100 flex items-center justify-center text-xl flex-shrink-0">🍽️</div>`;
+      const histIdx   = history.indexOf(entry);
+      const displayNum = history.length - histIdx;
+
+      return `
       <div class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-        <button class="w-full text-left px-5 py-4 flex items-center justify-between hover:bg-gray-50 transition"
+        <button class="w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition"
           onclick="toggleItem('body-${entry.id}','arr-${entry.id}')">
-          <div>
-            <span class="font-medium text-gray-800">⭐ レシピ ${history.length - i}</span>
-            <span class="ml-2 text-xs text-gray-400">${entry.date}</span>
+          ${thumbHtml}
+          <div class="flex-1 min-w-0">
+            <div class="flex items-center gap-2 flex-wrap">
+              <span class="font-medium text-gray-800">${modeEmoji} ${modeLabel} ${displayNum}</span>
+              ${srvLabel ? `<span class="text-xs text-orange-500 font-semibold">${srvLabel}</span>` : ""}
+              <span class="text-xs text-gray-400">${entry.date}</span>
+            </div>
+            ${tagHtml ? `<div class="mt-1 flex flex-wrap gap-1">${tagHtml}</div>` : ""}
           </div>
-          <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200">▼</span>
+          <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200 flex-shrink-0">▼</span>
         </button>
         <div id="body-${entry.id}" class="hidden px-5 pb-5 border-t border-gray-100">
           <div class="recipe-content text-sm mt-4">${marked.parse(entry.content)}</div>
           <button onclick="deleteItem('${entry.id}')"
             class="mt-4 text-xs text-red-400 hover:text-red-600 transition">🗑️ この項目を削除</button>
         </div>
-      </div>`).join("");
+      </div>`;
+    }).join("");
   }
 
   function toggleItem(bodyId, arrId) {
