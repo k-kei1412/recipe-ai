@@ -680,21 +680,21 @@ ${stepNote}
 
       return `
       <div class="bg-white rounded-2xl shadow-sm mb-4 overflow-hidden">
-        <button class="w-full text-left px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition"
+        <div class="w-full px-5 py-4 flex items-center gap-3 hover:bg-gray-50 transition cursor-pointer select-none"
           onclick="toggleItem('body-${entry.id}','arr-${entry.id}')">
           ${thumbHtml}
-          <div class="flex-1 min-w-0">
-            <div class="flex items-center gap-2 flex-wrap">
+          <div class="flex-1 min-w-0" onclick="event.stopPropagation()">
+            <div class="flex items-center gap-1.5 flex-wrap">
               <span class="font-medium text-gray-800">${displayTitle}</span>
-              <button onclick="editTitle('${entry.id}');event.stopPropagation();"
-                class="text-gray-300 hover:text-orange-400 transition text-xs px-0.5" title="名前を変更">✏️</button>
+              <button onclick="editTitle('${entry.id}')"
+                class="text-gray-300 hover:text-orange-400 transition text-sm leading-none" title="名前を変更">✏️</button>
               ${srvLabel ? `<span class="text-xs text-orange-500 font-semibold">${srvLabel}</span>` : ""}
               <span class="text-xs text-gray-400">${entry.date}</span>
             </div>
             ${tagHtml ? `<div class="mt-1 flex flex-wrap gap-1">${tagHtml}</div>` : ""}
           </div>
-          <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200 flex-shrink-0">▼</span>
-        </button>
+          <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200 flex-shrink-0 pointer-events-none">▼</span>
+        </div>
         <div id="body-${entry.id}" class="hidden px-5 pb-5 border-t border-gray-100">
           <div class="recipe-content text-sm mt-4">${marked.parse(entry.content)}</div>
           <button onclick="deleteItem('${entry.id}')"
