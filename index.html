@@ -576,15 +576,15 @@ ${stepNote}
 
   // ── Google Images link injection ──────────────────────────────────────────
   function addSearchLinks(html) {
-    return html.replace(/<h2>(.+?)<\/h2>/g, (_, content) => {
-      const m = content.match(/【([^】]+)】/);
-      if (!m) return `<h2>${content}</h2>`;
-      const url = `https://www.google.com/search?q=${encodeURIComponent(m[1])}&tbm=isch`;
-      const linked = content.replace(
-        `【${m[1]}】`,
-        `<a href="${url}" target="_blank" rel="noopener" class="dish-search-link" title="Google画像で「${m[1]}」を検索">【${m[1]}】</a>`
+    return html.replace(/<h2[^>]*>[\s\S]*?<\/h2>/g, match => {
+      const m = match.match(/【([^】]+)】/);
+      if (!m) return match;
+      const name = m[1];
+      const url = `https://www.google.com/search?q=${encodeURIComponent(name)}&tbm=isch`;
+      return match.replace(
+        `【${name}】`,
+        `<a href="${url}" target="_blank" rel="noopener" class="dish-search-link" title="Google画像で「${name}」を検索">【${name}】</a>`
       );
-      return `<h2>${linked}</h2>`;
     });
   }
 
