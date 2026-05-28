@@ -52,6 +52,16 @@
     .recipe-content hr { margin:1.6rem 0; border-color:#e5e7eb; }
     .recipe-content strong { color:#1f2937; }
 
+    .dish-search-link {
+      color: inherit;
+      text-decoration: underline;
+      text-decoration-style: dotted;
+      text-decoration-color: #f97316;
+      text-underline-offset: 4px;
+      cursor: pointer;
+    }
+    .dish-search-link:hover { text-decoration-style: solid; opacity: .8; }
+
     @keyframes spin { to { transform:rotate(360deg); } }
     .spinner { animation:spin 1s linear infinite; }
 
@@ -239,13 +249,13 @@
       <div id="recipe-box" class="hidden mt-6">
         <div class="flex items-center justify-between mb-3">
           <h2 class="text-lg font-bold text-gray-800">🍽️ 提案されたレシピ</h2>
-          <button id="save-btn" onclick="saveRecipe()"
+          <button id="save-all-btn" onclick="saveAllRecipes()"
             class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow">
-            ⭐ 保存
+            ⭐ すべて保存
           </button>
         </div>
-        <div id="recipe-content" class="recipe-content bg-white rounded-2xl p-5 shadow-sm leading-relaxed"></div>
-        <p id="saved-ok" class="mt-2 text-center text-sm text-green-600 hidden">⭐ お気に入りに保存しました！</p>
+        <div id="recipe-content" class="leading-relaxed"></div>
+        <p id="saved-ok" class="mt-2 text-center text-sm text-green-600 hidden"></p>
       </div>
 
     </div>
@@ -278,12 +288,12 @@
   };
 
   // ── State ─────────────────────────────────────────────────────────────────
-  let images        = [];
-  let currentRecipe = null;
-  let currentMode   = null;
-  let recipeSaved   = false;
-  let servings      = 2;
-  let historyFilter = "";
+  let images         = [];
+  let currentRecipes = [];  // 分割された個別レシピ
+  let currentMode    = null;
+  let savedIndices   = new Set();
+  let servings       = 2;
+  let historyFilter  = "";
 
   // ── Boot ──────────────────────────────────────────────────────────────────
   window.addEventListener("DOMContentLoaded", () => {
@@ -433,8 +443,7 @@
     if (!apiKey)             { openSettings(); showError("まずAPIキーを設定・保存してください。"); return; }
     if (images.length === 0) { showError("画像をアップロードしてください。"); return; }
 
-    currentMode  = mode;
-    recipeSaved  = false;
+    currentMode = mode;
     hideRecipe(); hideError();
     setLoading(true);
 
@@ -557,7 +566,6 @@ ${stepNote}
       }
 
       if (!text) throw new Error("AIからの返答が空でした。もう一度お試しください。");
-      currentRecipe = text;
       showRecipe(text);
     } catch (e) {
       showError(e.message || "不明なエラーが発生しました。");
@@ -566,31 +574,80 @@ ${stepNote}
     }
   }
 
+  // ── Google Images link injection ──────────────────────────────────────────
+  function addSearchLinks(html) {
+    return html.replace(/<h2>(.+?)<\/h2>/g, (_, content) => {
+      const m = content.match(/【([^】]+)】/);
+      if (!m) return `<h2>${content}</h2>`;
+      const url = `https://www.google.com/search?q=${encodeURIComponent(m[1])}&tbm=isch`;
+      const linked = content.replace(
+        `【${m[1]}】`,
+        `<a href="${url}" target="_blank" rel="noopener" class="dish-search-link" title="Google画像で「${m[1]}」を検索">【${m[1]}】</a>`
+      );
+      return `<h2>${linked}</h2>`;
+    });
+  }
+
+  // ── Recipe splitting ──────────────────────────────────────────────────────
+  function parseRecipes(text) {
+    const parts = text.split(/\n---+\n|^---+\n|\n---+$/m);
+    const recipes = parts.map(s => s.trim()).filter(s => s.length > 0 && /##\s*【/.test(s));
+    return recipes.length > 0 ? recipes : [text.trim()];
+  }
+
   // ── Display helpers ───────────────────────────────────────────────────────
   function showRecipe(text) {
-    document.getElementById("recipe-content").innerHTML = marked.parse(text);
+    currentRecipes = parseRecipes(text);
+    savedIndices   = new Set();
+
+    const container = document.getElementById("recipe-content");
+    container.innerHTML = currentRecipes.map((recipe, i) => `
+      <div class="bg-white rounded-2xl p-5 shadow-sm mb-4">
+        <div class="recipe-content">${addSearchLinks(marked.parse(recipe))}</div>
+        <div class="flex justify-end mt-3 pt-3 border-t border-gray-100">
+          <button id="save-btn-${i}" onclick="saveRecipe(${i})"
+            class="bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-3 py-1.5 rounded-xl text-xs transition shadow">
+            ⭐ この料理を保存
+          </button>
+        </div>
+      </div>
+    `).join("");
+
     document.getElementById("recipe-box").classList.remove("hidden");
     document.getElementById("saved-ok").classList.add("hidden");
-    resetSaveBtn();
+    resetSaveAllBtn();
   }
+
   function hideRecipe() {
-    currentRecipe = null;
-    currentMode   = null;
+    currentRecipes = [];
+    savedIndices   = new Set();
+    currentMode    = null;
     document.getElementById("recipe-box").classList.add("hidden");
   }
-  function resetSaveBtn() {
-    const btn = document.getElementById("save-btn");
-    btn.disabled  = false;
-    btn.textContent = "⭐ 保存";
-    btn.className = "bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow";
-    btn.onclick   = saveRecipe;
+
+  function resetSaveAllBtn() {
+    const btn = document.getElementById("save-all-btn");
+    btn.disabled    = false;
+    btn.textContent = "⭐ すべて保存";
+    btn.className   = "bg-yellow-400 hover:bg-yellow-500 text-white font-bold px-4 py-2 rounded-xl text-sm transition shadow";
+    btn.onclick     = saveAllRecipes;
   }
-  function markSaveBtn() {
-    const btn = document.getElementById("save-btn");
-    btn.disabled  = true;
+
+  function markSaveAllBtn() {
+    const btn = document.getElementById("save-all-btn");
+    btn.disabled    = true;
+    btn.textContent = "✓ すべて保存済み";
+    btn.className   = "bg-gray-200 text-gray-500 font-bold px-4 py-2 rounded-xl text-sm cursor-not-allowed";
+    btn.onclick     = null;
+  }
+
+  function markIndividualBtn(index) {
+    const btn = document.getElementById(`save-btn-${index}`);
+    if (!btn) return;
+    btn.disabled    = true;
     btn.textContent = "✓ 保存済み";
-    btn.className = "bg-gray-200 text-gray-500 font-bold px-4 py-2 rounded-xl text-sm cursor-not-allowed";
-    btn.onclick   = null;
+    btn.className   = "bg-gray-200 text-gray-500 font-bold px-3 py-1.5 rounded-xl text-xs cursor-not-allowed";
+    btn.onclick     = null;
   }
   function showError(msg) { document.getElementById("error-msg").textContent = msg; document.getElementById("error-box").classList.remove("hidden"); }
   function hideError()    { document.getElementById("error-box").classList.add("hidden"); }
@@ -602,18 +659,19 @@ ${stepNote}
   }
 
   // ── Save / History ────────────────────────────────────────────────────────
-  async function saveRecipe() {
-    if (!currentRecipe || recipeSaved) return;
+  async function saveRecipe(index) {
+    if (savedIndices.has(index) || !currentRecipes[index]) return;
 
-    const thumbnail = images.length > 0 ? await compressThumb(images[0].dataUrl) : null;
-    const tags      = extractTags(currentRecipe);
-    const history   = LS.get("recipe_history", []);
-    const now       = new Date();
+    const recipeText = currentRecipes[index];
+    const thumbnail  = images.length > 0 ? await compressThumb(images[0].dataUrl) : null;
+    const tags       = extractTags(recipeText);
+    const history    = LS.get("recipe_history", []);
+    const now        = new Date();
 
     history.unshift({
-      id:        now.getTime().toString(),
+      id:        (now.getTime() + index).toString(),
       date:      now.toLocaleDateString("ja-JP", { year:"numeric", month:"2-digit", day:"2-digit", hour:"2-digit", minute:"2-digit" }),
-      content:   currentRecipe,
+      content:   recipeText,
       thumbnail,
       tags,
       title:     "",
@@ -622,10 +680,26 @@ ${stepNote}
     });
 
     LS.set("recipe_history", history.slice(0, 50));
-    recipeSaved = true;
-    markSaveBtn();
-    document.getElementById("saved-ok").classList.remove("hidden");
+    savedIndices.add(index);
+    markIndividualBtn(index);
+
+    if (savedIndices.size === currentRecipes.length) markSaveAllBtn();
+
+    const el = document.getElementById("saved-ok");
+    el.textContent = "⭐ 保存しました！";
+    el.classList.remove("hidden");
     updateBadge();
+  }
+
+  async function saveAllRecipes() {
+    const unsaved = currentRecipes.map((_, i) => i).filter(i => !savedIndices.has(i));
+    if (unsaved.length === 0) return;
+    for (const i of unsaved) {
+      await saveRecipe(i);
+    }
+    const el = document.getElementById("saved-ok");
+    el.textContent = unsaved.length > 1 ? `⭐ ${unsaved.length}品すべて保存しました！` : "⭐ 保存しました！";
+    el.classList.remove("hidden");
   }
 
   function updateBadge() {
@@ -696,7 +770,7 @@ ${stepNote}
           <span id="arr-${entry.id}" class="text-gray-400 transition-transform duration-200 flex-shrink-0 pointer-events-none">▼</span>
         </div>
         <div id="body-${entry.id}" class="hidden px-5 pb-5 border-t border-gray-100">
-          <div class="recipe-content text-sm mt-4">${marked.parse(entry.content)}</div>
+          <div class="recipe-content text-sm mt-4">${addSearchLinks(marked.parse(entry.content))}</div>
           <button onclick="deleteItem('${entry.id}')"
             class="mt-4 text-xs text-red-400 hover:text-red-600 transition">🗑️ この項目を削除</button>
         </div>
