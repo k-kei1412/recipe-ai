@@ -52,6 +52,8 @@
     .recipe-content hr { margin:1.6rem 0; border-color:#e5e7eb; }
     .recipe-content strong { color:#1f2937; }
 
+    .ingredients-section h2 { color: #059669; }
+
     .dish-search-link {
       color: inherit;
       text-decoration: underline;
@@ -457,7 +459,13 @@
     let prompt;
 
     if (mode === "bento") {
-      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
+      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別し、まず以下の形式でリストアップしてください：
+
+## 🔍 識別した食材
+- 食材名（できるだけ詳しく。例：鶏もも肉、玉ねぎ、にんじん など）
+
+---
+${extraLine}
 それらの食材を参考にした**お弁当のおかず**を3品提案してください。
 すべての食材を必ず使い切る必要はありません。使えそうな食材があれば積極的に活用してください。
 
@@ -490,7 +498,13 @@ ${stepNote}
 日本語で答えてください。`;
 
     } else {
-      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別してください。${extraLine}
+      prompt = `添付した画像（${images.length}枚）に写っている食材をすべて識別し、まず以下の形式でリストアップしてください：
+
+## 🔍 識別した食材
+- 食材名（できるだけ詳しく。例：豚こま切れ肉、玉ねぎ、にんじん など）
+
+---
+${extraLine}
 それらの食材を参考にして、作りやすい料理を3つ提案してください。
 すべての食材を必ず使い切る必要はありません。使えそうな食材があれば積極的に活用してください。
 
@@ -576,15 +590,18 @@ ${stepNote}
 
   // ── Google Images link injection ──────────────────────────────────────────
   function addSearchLinks(html) {
-    return html.replace(/<h2[^>]*>[\s\S]*?<\/h2>/g, match => {
-      const m = match.match(/【([^】]+)】/);
+    return html.replace(/<h2([^>]*)>([\s\S]*?)<\/h2>/g, (match, attrs, innerHtml) => {
+      const plainText = innerHtml.replace(/<[^>]+>/g, '').trim();
+      const m = plainText.match(/【([^】]+)】/);
       if (!m) return match;
-      const name = m[1];
+      let name = m[1].trim();
+      // 【】の中が数字だけの場合（例:【1】）は前後のテキストから料理名を取得
+      if (/^\d+[.。]?$/.test(name)) {
+        name = plainText.replace(/【[^】]*】/g, '').replace(/^\s*\d+[.。、\s]+/, '').trim();
+      }
+      if (!name) return match;
       const url = `https://www.google.com/search?q=${encodeURIComponent(name)}&tbm=isch`;
-      return match.replace(
-        `【${name}】`,
-        `<a href="${url}" target="_blank" rel="noopener" class="dish-search-link" title="Google画像で「${name}」を検索">【${name}】</a>`
-      );
+      return `<h2${attrs}><a href="${url}" target="_blank" rel="noopener noreferrer" class="dish-search-link" title="Google画像で「${name}」を検索">${innerHtml}</a></h2>`;
     });
   }
 
@@ -595,13 +612,32 @@ ${stepNote}
     return recipes.length > 0 ? recipes : [text.trim()];
   }
 
+  // ── Ingredients extraction ────────────────────────────────────────────────
+  function extractIngredients(text) {
+    const firstRecipeIdx = text.search(/##\s*【/);
+    if (firstRecipeIdx <= 0) return { ingredientsText: '', recipesText: text };
+    const ingredientsText = text.slice(0, firstRecipeIdx).replace(/(\n?-{3,}\n?)+$/, '').trim();
+    const recipesText = text.slice(firstRecipeIdx);
+    return { ingredientsText, recipesText };
+  }
+
   // ── Display helpers ───────────────────────────────────────────────────────
   function showRecipe(text) {
-    currentRecipes = parseRecipes(text);
+    const { ingredientsText, recipesText } = extractIngredients(text);
+    currentRecipes = parseRecipes(recipesText);
     savedIndices   = new Set();
 
     const container = document.getElementById("recipe-content");
-    container.innerHTML = currentRecipes.map((recipe, i) => `
+    let html = '';
+
+    if (ingredientsText) {
+      html += `
+        <div class="bg-emerald-50 border border-emerald-200 rounded-2xl p-5 shadow-sm mb-4">
+          <div class="recipe-content ingredients-section">${marked.parse(ingredientsText)}</div>
+        </div>`;
+    }
+
+    html += currentRecipes.map((recipe, i) => `
       <div class="bg-white rounded-2xl p-5 shadow-sm mb-4">
         <div class="recipe-content">${addSearchLinks(marked.parse(recipe))}</div>
         <div class="flex justify-end mt-3 pt-3 border-t border-gray-100">
@@ -611,8 +647,9 @@ ${stepNote}
           </button>
         </div>
       </div>
-    `).join("");
+    `).join('');
 
+    container.innerHTML = html;
     document.getElementById("recipe-box").classList.remove("hidden");
     document.getElementById("saved-ok").classList.add("hidden");
     resetSaveAllBtn();
